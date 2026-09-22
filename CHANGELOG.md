@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-09-22)
 
-First version, extracted from adriangoldner.com.
+First release, extracted from adriangoldner.com.
 
 ### Added
 - Signed links bound to the viewer: `{{ private_media:url }}` and `PrivateMedia::url()`.
@@ -17,3 +17,4 @@ First version, extracted from adriangoldner.com.
 - Active content (HTML, SVG, XML, JS …) as attachment; every stream with `Content-Security-Policy: sandbox`;
   UTF-8 file names with an ASCII fallback.
 - A file that cannot be opened is `storage_unavailable` (503), not a truncated 200.
+- Refusal JSON keeps umlauts and slashes unescaped, readable when opened in a tab.
