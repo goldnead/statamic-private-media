@@ -126,9 +126,15 @@ class MediaController extends Controller
                 ->header('Content-Range', 'bytes */'.$file->size);
         }
 
+        $response = $this->deliverer->stream($request, $file, $range);
+
+        if ($response instanceof Reason) {
+            return $this->refuse($request, $user, $resource, $file->path, $response);
+        }
+
         $this->served($request, $user, $resource, $file->path, $mode, $range->isOpening());
 
-        return $this->deliverer->stream($request, $file, $range);
+        return $response;
     }
 
     private function served(Request $request, mixed $user, string $resource, string $path, string $mode, bool $opening): void

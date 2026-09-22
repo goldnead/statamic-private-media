@@ -9,6 +9,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -84,13 +86,28 @@ class Deliverer
         return new RedirectResponse($url, 302, ['Cache-Control' => 'private, no-store']);
     }
 
-    public function stream(Request $request, MediaFile $file, ByteRange $range): StreamedResponse
+    /**
+     * Stream the range. The file is opened here, before any header is sent:
+     * a file that cannot be opened is `storage_unavailable`, not a 200 whose
+     * body breaks off after the headers promised ten megabytes.
+     */
+    public function stream(Request $request, MediaFile $file, ByteRange $range): StreamedResponse|Reason
     {
+        $handle = $this->open($file);
+
+        if ($handle === null) {
+            return Reason::StorageUnavailable;
+        }
+
         $headers = [
             'Content-Type' => $file->mimeType,
             'Content-Length' => (string) $range->length(),
             'Accept-Ranges' => 'bytes',
-            'Content-Disposition' => 'inline; filename="'.addcslashes($file->name(), '"\\').'"',
+            'Content-Disposition' => $this->disposition($file),
+            // The file is served from the site's own origin. A sandbox keeps
+            // anything that slips past the disposition (an HTML file opened
+            // directly, an SVG) from running script with the site's cookies.
+            'Content-Security-Policy' => 'sandbox',
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
         ];
@@ -101,18 +118,12 @@ class Deliverer
 
         $chunk = max(1024, (int) config('private-media.delivery.chunk_size', 8192));
 
-        return new StreamedResponse(function () use ($file, $range, $chunk, $request): void {
-            if ($request->isMethod('HEAD')) {
-                return;
-            }
-
-            $handle = $file->filesystem->readStream($file->path);
-
-            if (! is_resource($handle)) {
-                return;
-            }
-
+        return new StreamedResponse(function () use ($handle, $range, $chunk, $request): void {
             try {
+                if ($request->isMethod('HEAD')) {
+                    return;
+                }
+
                 $this->seek($handle, $range->start, $chunk);
 
                 $remaining = $range->length();
@@ -135,7 +146,60 @@ class Deliverer
     }
 
     /**
+     * @return resource|null
+     */
+    private function open(MediaFile $file)
+    {
+        try {
+            $handle = $file->filesystem->readStream($file->path);
+        } catch (Throwable $e) {
+            if (! MediaSource::isStorageFailure($e)) {
+                throw $e;
+            }
+
+            $handle = null;
+        }
+
+        if (is_resource($handle)) {
+            return $handle;
+        }
+
+        Log::warning('private-media: file could not be opened for streaming', [
+            'reason' => Reason::StorageUnavailable->value,
+            'disk' => $file->disk,
+            'path' => $file->path,
+            'runbook' => 'The file was found but would not open. Check the disk, its permissions and credentials.',
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Inline only for types a browser plays or shows without running code.
+     * Everything else (HTML, SVG, XML, JavaScript, office files) is an
+     * attachment: rendered same-origin it could script against the site.
+     */
+    public function disposition(MediaFile $file): string
+    {
+        $inline = preg_match('#^(video|audio)/#i', $file->mimeType) === 1
+            || preg_match('#^image/(png|jpe?g|gif|webp|avif)$#i', $file->mimeType) === 1
+            || in_array(strtolower($file->mimeType), ['application/pdf', 'text/plain'], true);
+
+        $name = $file->name();
+        $fallback = str_replace(['%', '/', '\\'], '_', Str::ascii($name));
+        $fallback = (string) preg_replace('/[^\x20-\x7e]/', '_', $fallback);
+
+        return HeaderUtils::makeDisposition(
+            $inline ? HeaderUtils::DISPOSITION_INLINE : HeaderUtils::DISPOSITION_ATTACHMENT,
+            $name,
+            $fallback === '' ? 'download' : $fallback,
+        );
+    }
+
+    /**
      * A local stream seeks; a remote one may not, and is read forward instead.
+     * That costs the skipped bytes in transfer from the provider on every
+     * seek, which is why `auto` redirects remote disks instead of streaming.
      *
      * @param  resource  $handle
      */
