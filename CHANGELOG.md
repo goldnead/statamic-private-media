@@ -13,3 +13,7 @@ First version, extracted from adriangoldner.com.
 - `MediaAccess` contract; statamic-entitlements as default, closed without it.
 - Audit table `private_media_access_log`, `private-media:prune`.
 - Events `MediaServed` and `MediaRefused`.
+- Route throttle (`routes.throttle`, default `300,1`); anonymous refusals go to the log, not the table.
+- Active content (HTML, SVG, XML, JS …) as attachment; every stream with `Content-Security-Policy: sandbox`;
+  UTF-8 file names with an ASCII fallback.
+- A file that cannot be opened is `storage_unavailable` (503), not a truncated 200.

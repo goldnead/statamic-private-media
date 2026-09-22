@@ -50,6 +50,10 @@ anyone who guesses the path, and this addon never sees the request.
 | `asset` | a path in the container, a `container::path` id, or an asset from an assets field |
 | `ttl` | minutes the link stays valid; default `links.ttl` (240) |
 
+**Static caching:** the link belongs to one user. On a site with static caching, wrap the tag in
+`{{ nocache }}…{{ /nocache }}`, or the first visitor's link is cached and served to everyone
+(who is then refused as `wrong_user`).
+
 The tag renders nothing for a guest, with the route off, or for an asset from another container.
 From PHP: `PrivateMedia::url($user, 'cvt-101', 'videos/intro.mp4', ttlMinutes: 30)`, `null` in the
 same cases.
@@ -102,7 +106,23 @@ Byte ranges, when streaming:
 | start at or past the size, `bytes=-0` | 416 with `Content-Range: bytes */size` |
 | several ranges (`bytes=0-1,4-5`) | 200, whole file (no multipart) |
 
-Responses carry `Cache-Control: private, no-store`.
+Responses carry `Cache-Control: private, no-store` and `Content-Security-Policy: sandbox`. Video,
+audio, raster images, PDF and plain text go out `inline`; everything else (HTML, SVG, XML,
+JavaScript, office files) as `attachment`, so nothing runs script on the site's origin.
+
+**Remote disks and `stream`:** Flysystem has no ranged read, so streaming from S3 and similar
+reads a range by skipping forward from byte 0. Every seek into a long video then pulls everything
+before it from the bucket. For remote disks keep `auto` or set `redirect`; `stream` is meant for
+local disks.
+
+**Files uploaded straight to the bucket:** with a container as source, a path is looked up in
+Statamic's asset listing, which is cached. A file put into the bucket outside Statamic (CLI,
+provider console) answers `not_found` until `php artisan statamic:assets:clear-cache` has run.
+Uploads through the Control Panel are seen at once.
+
+A request refused as `signature` or `unauthenticated` without a signed-in user goes to the log
+only, not to the audit table, so an anonymous caller cannot fill it. The route is throttled
+(`routes.throttle`, default `300,1` per user or IP; `null` switches it off).
 
 ## Access
 
@@ -138,10 +158,16 @@ Schedule::command('private-media:prune')->daily();   // older than audit.retenti
 Events: `MediaServed` (user, resource, path, delivery, opening, range; fired on every served
 request, count views on `opening`) and `MediaRefused` (user, resource, path, reason).
 
-## Not included
+## Limits
 
-Transcoding, HLS, DRM, and limits on concurrent devices. A signed link stops forwarding, not a
-user who downloads the stream. See `docs/EXTRACTION.md` for open questions.
+- **Delivery as in the source site:** local disks are streamed, remote disks redirect to the
+  provider's temporary URL. After the redirect, that URL works for anyone holding it until it
+  expires (`delivery.temporary_url_ttl`); this addon no longer sees those requests.
+- **No limit on concurrent devices.** One user can play the same file on as many devices as they
+  like; each gets its own link.
+- No transcoding, HLS or DRM. A signed link stops forwarding, not a user who saves the stream.
+
+See `docs/EXTRACTION.md` for open questions.
 
 ## Testing
 
