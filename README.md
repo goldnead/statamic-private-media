@@ -35,7 +35,7 @@ The container must sit on a disk **without a public URL** (for example a local d
 `storage/app/private`, or a bucket without public read). A public container hands the file to
 anyone who guesses the path, and this addon never sees the request.
 
-## Links
+## Usage
 
 ```antlers
 <video src="{{ private_media:url resource="cvt-101" asset="videos/intro.mp4" }}" controls></video>
