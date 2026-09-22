@@ -85,7 +85,8 @@ it('refuses path traversal behind a valid signature', function (string $path) {
 
     $response = $this->actingAs($this->viewer)->getJson(signedFor($this->viewer, $path));
 
-    expect($response->status())->toBeIn([403, 404]);
+    // not_found, not signature: the signature is valid, the path fence has to hold.
+    $response->assertNotFound()->assertJsonPath('error.code', 'not_found');
     expect($response->getContent())->not->toContain('secret');
 })->with([
     'parent' => ['../outside.txt'],
@@ -98,12 +99,18 @@ it('refuses path traversal behind a valid signature', function (string $path) {
     'scheme' => ['file:///etc/passwd'],
 ]);
 
-it('refuses a raw encoded climb in the request URL', function () {
-    $link = str_replace('videos/intro.mp4', 'videos/%2e%2e/%2e%2e/outside.txt', mediaLink($this->viewer));
+it('refuses a raw encoded climb in the request URL, signed over exactly that URL', function () {
+    // Signed by hand over the raw, still-encoded URL, the way an attacker with
+    // the app key could not but a careless template helper might: the
+    // signature holds, so only the path fence stands between it and the file.
+    $unsigned = 'http://localhost/private-media/cvt-101/videos/%2e%2e/%2e%2e/outside.txt?'
+        .http_build_query(['expires' => now()->addHour()->getTimestamp(), 'viewer' => PrivateMedia::viewerToken((string) $this->viewer->getKey())]);
+    $key = (string) config('app.key'); // Laravel signs with the key string as configured, prefix and all.
+    $link = $unsigned.'&signature='.hash_hmac('sha256', $unsigned, $key);
 
-    $response = $this->actingAs($this->viewer)->getJson($link);
-
-    expect($response->status())->toBeIn([403, 404]);
+    $this->actingAs($this->viewer)->getJson($link)
+        ->assertNotFound()
+        ->assertJsonPath('error.code', 'not_found');
 });
 
 it('refuses a symlink in the container that points out of it', function () {
