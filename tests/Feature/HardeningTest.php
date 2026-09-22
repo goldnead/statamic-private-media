@@ -43,6 +43,17 @@ it('writes no audit row for a guest holding a valid link, only a log line', func
     Log::shouldHaveReceived('info')->withArgs(fn ($message, $context) => $context['reason'] === 'unauthenticated')->once();
 });
 
+it('sends refusal messages with raw umlauts and slashes, not \u escapes', function () {
+    app()->setLocale('de');
+    $other = viewer('b@example.test');
+
+    $body = $this->actingAs($other)->getJson(mediaLink($this->viewer))
+        ->assertJsonPath('error.code', 'wrong_user')
+        ->getContent();
+
+    expect($body)->toContain('gehört')->not->toContain(chr(92).'u00f6');
+});
+
 it('still writes a row for a signed-in user with a bad signature', function () {
     $this->actingAs($this->viewer)->getJson(mediaLink($this->viewer).'0')->assertJsonPath('error.code', 'signature');
 

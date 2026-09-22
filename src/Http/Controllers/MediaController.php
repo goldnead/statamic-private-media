@@ -169,6 +169,9 @@ class MediaController extends Controller
             ['error' => ['code' => $reason->value, 'message' => $reason->message()]],
             $reason->status(),
             ['Cache-Control' => 'private, no-store'],
+            // Opened directly in a browser tab, an escaped umlaut is what a
+            // user would read: the message has to stay readable as raw text.
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
         );
     }
 }
