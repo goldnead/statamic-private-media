@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    background: radial-gradient(1200px 700px at 78% 22%, #6B0A2E 0%, #3A0618 55%, #12030A 100%);
+    color: #fff; overflow: hidden; position: relative;
+  }
+  .wrap { display: flex; height: 100%; align-items: center; padding: 0 92px; gap: 64px; }
+  .copy { max-width: 660px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-size: 22px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+    color: #F8C6D6; margin-bottom: 26px;
+  }
+  .eyebrow .dot { width: 12px; height: 12px; border-radius: 50%; background: #E8517F; box-shadow: 0 0 18px #E8517F; }
+  h1 { font-size: 72px; line-height: 1.02; font-weight: 800; letter-spacing: -.02em; }
+  h1 .accent { background: linear-gradient(90deg,#F8C6D6,#EF8FAE); -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; }
+  p.sub { margin-top: 28px; font-size: 30px; line-height: 1.35; color: #EAD7DD; font-weight: 400; }
+  .badges { margin-top: 40px; display: flex; gap: 14px; }
+  .badge { font-size: 22px; font-weight: 600; padding: 12px 22px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #F8C6D6; white-space: nowrap; }
+  .art { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .glyph { width: 360px; height: 360px; filter: drop-shadow(0 30px 60px rgba(0,0,0,.45)); }
+  .corner { position: absolute; right: -120px; bottom: -160px; width: 520px; height: 520px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #E0245E47, transparent 60%); }
+</style>
+</head>
+<body>
+  <div class="corner"></div>
+  <div class="wrap">
+    <div class="copy">
+      <span class="eyebrow"><span class="dot"></span>Statamic Addon</span>
+      <h1>Statamic<br><span class="accent">Private Media</span></h1>
+      <p class="sub">Signed links bound to the viewer, byte ranges for video, an audit trail.</p>
+      <div class="badges">
+        <span class="badge">Viewer-bound links</span>
+        <span class="badge">Range streaming</span>
+        <span class="badge">Audit trail</span>
+      </div>
+    </div>
+    <div class="art">
+      <svg class="glyph" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#E0245E"/><stop offset="1" stop-color="#5B0A26"/>
+          </linearGradient>
+          <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#5B0A26" flood-opacity="0.34"/>
+          </filter>
+        </defs>
+        <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+        <!-- a padlock with a play mark on its body, see icon.svg -->
+        <g filter="url(#sh)">
+          <path d="M176 238 V190 A80 80 0 0 1 336 190 V238" stroke="#FFFFFF" stroke-width="36" stroke-linecap="round"/>
+          <rect x="120" y="226" width="272" height="206" rx="40" fill="#FFFFFF"/>
+        </g>
+        <path d="M226 280 L226 380 L312 330 Z" fill="url(#bg)" stroke="url(#bg)" stroke-width="16" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
