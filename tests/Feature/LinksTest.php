@@ -73,6 +73,31 @@ it('mounts the route under the configured prefix', function () {
     expect(PrivateMedia::url($this->viewer, 'cvt-101', 'videos/intro.mp4'))->toStartWith('http://localhost/members/media/cvt-101/');
 });
 
+it('mounts the route once through Statamic\'s whole boot sequence', function () {
+    // AddonServiceProvider::boot() calls bootRoutes(), bootPublishables() and
+    // bootCommands() and then bootAddon(). Overriding those names ran each
+    // body twice; the addon's own work has to hang off bootAddon() alone.
+    Route::setRoutes(new RouteCollection);
+    $provider = app()->getProvider(ServiceProvider::class);
+
+    foreach (['bootCommands', 'bootPublishables', 'bootRoutes'] as $method) {
+        (new ReflectionMethod($provider, $method))->invoke($provider);
+    }
+    $provider->bootAddon();
+
+    $mounted = collect(Route::getRoutes()->getRoutes())->filter(fn ($route) => $route->getName() === 'private-media.show');
+
+    expect($mounted)->toHaveCount(1);
+
+    // The RouteCollection dedupes by method and URI, so the count alone would
+    // hide a second registration. The provider must not redefine the hooks
+    // Statamic's boot() already calls.
+    foreach (['bootCommands', 'bootPublishables', 'bootRoutes'] as $method) {
+        expect((new ReflectionMethod($provider, $method))->getDeclaringClass()->getName())
+            ->not->toBe(ServiceProvider::class, "{$method} is Statamic's hook, not the addon's");
+    }
+});
+
 it('mounts no route and signs no link while switched off', function () {
     config()->set('private-media.routes.enabled', false);
     Route::setRoutes(new RouteCollection);

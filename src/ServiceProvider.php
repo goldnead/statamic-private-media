@@ -37,10 +37,13 @@ class ServiceProvider extends AddonServiceProvider
 
     public function bootAddon(): void
     {
-        $this->bootMigrations()
-            ->bootCommands()
-            ->bootRoutes()
-            ->bootPublishables();
+        // Own names, not Statamic's bootRoutes()/bootCommands()/bootPublishables():
+        // AddonServiceProvider::boot() calls those itself right before
+        // bootAddon(), so overriding them ran every body twice.
+        $this->registerMigrations()
+            ->registerCommands()
+            ->registerDeliveryRoute()
+            ->registerPublishables();
     }
 
     /**
@@ -48,7 +51,7 @@ class ServiceProvider extends AddonServiceProvider
      * its own terms: the prefix and middleware come from config, and the
      * whole route is off until a site switches it on.
      */
-    protected function bootRoutes(): self
+    protected function registerDeliveryRoute(): self
     {
         if (! config('private-media.routes.enabled', false) || $this->app->routesAreCached()) {
             return $this;
@@ -71,7 +74,7 @@ class ServiceProvider extends AddonServiceProvider
         return $this;
     }
 
-    protected function bootMigrations(): self
+    protected function registerMigrations(): self
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
@@ -82,7 +85,7 @@ class ServiceProvider extends AddonServiceProvider
      * Registered by hand because core's own command discovery runs after
      * Statamic's boot sequence, which a plain console context never reaches.
      */
-    protected function bootCommands(): self
+    protected function registerCommands(): self
     {
         if ($this->app->runningInConsole()) {
             $this->commands([Console\Commands\Prune::class]);
@@ -91,7 +94,7 @@ class ServiceProvider extends AddonServiceProvider
         return $this;
     }
 
-    protected function bootPublishables(): self
+    protected function registerPublishables(): self
     {
         $this->publishes([
             __DIR__.'/../database/migrations' => database_path('migrations'),
