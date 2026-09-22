@@ -36,12 +36,17 @@ return [
     | `middleware` must include whatever puts the signed-in user on the request
     | (`web` for a session). `guard` picks the auth guard; null is the default.
     |
+    | `throttle` is Laravel's `throttle:` argument (requests,minutes), keyed by
+    | user or IP. A player asks for a video in several byte ranges and again on
+    | every seek, so keep it generous; null switches it off.
+    |
     */
 
     'routes' => [
         'enabled' => (bool) env('PRIVATE_MEDIA_ROUTES_ENABLED', false),
         'prefix' => env('PRIVATE_MEDIA_ROUTE_PREFIX', 'private-media'),
         'middleware' => ['web'],
+        'throttle' => env('PRIVATE_MEDIA_THROTTLE', '300,1'),
         'guard' => null,
     ],
 

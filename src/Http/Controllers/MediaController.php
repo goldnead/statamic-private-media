@@ -142,7 +142,20 @@ class MediaController extends Controller
 
     private function refuse(Request $request, mixed $user, string $resource, string $path, Reason $reason): JsonResponse
     {
-        $this->audit->record($request, $user, $resource, $path, $reason);
+        // Without a signed-in user only `signature` and `unauthenticated` can
+        // get here. Those go to the log, not the table: anybody can send them,
+        // as often as the throttle lets them, and a row each would let an
+        // anonymous caller fill the database.
+        if (UserId::tryOf($user) === null) {
+            Log::info('private-media: anonymous request refused', [
+                'reason' => $reason->value,
+                'resource' => mb_substr($resource, 0, 191),
+                'path' => mb_substr($path, 0, 255),
+                'ip' => $request->ip(),
+            ]);
+        } else {
+            $this->audit->record($request, $user, $resource, $path, $reason);
+        }
 
         MediaRefused::dispatch($user, $resource, $path, $reason);
 

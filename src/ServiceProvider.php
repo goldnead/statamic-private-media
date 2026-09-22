@@ -54,7 +54,14 @@ class ServiceProvider extends AddonServiceProvider
             return $this;
         }
 
-        Route::middleware((array) config('private-media.routes.middleware', ['web']))
+        $middleware = (array) config('private-media.routes.middleware', ['web']);
+        $throttle = config('private-media.routes.throttle');
+
+        if (is_string($throttle) && $throttle !== '') {
+            $middleware[] = 'throttle:'.$throttle;
+        }
+
+        Route::middleware($middleware)
             ->prefix(trim((string) config('private-media.routes.prefix', 'private-media'), '/'))
             ->name('private-media.')
             ->group(__DIR__.'/../routes/media.php');
