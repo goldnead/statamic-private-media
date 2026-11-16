@@ -14,3 +14,6 @@
 
 # Deliberately kept: /config, /database, /resources/lang, /routes, /src,
 # README.md, CHANGELOG.md, LICENSE.md.
+
+# Internal listing files: not needed by installing sites.
+/art                export-ignore
