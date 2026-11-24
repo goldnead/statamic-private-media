@@ -22,13 +22,13 @@ class Prune extends Command
     {
         $option = $this->option('days');
 
-        if ($option !== null && $option !== '' && filter_var($option, FILTER_VALIDATE_INT) === false) {
-            $this->components->error("--days must be a whole number, got \"{$option}\".");
+        if ($option !== null && (! is_scalar($option) || preg_match('/^\d+$/', (string) $option) !== 1)) {
+            $this->components->error('--days must be a whole number, got "'.(is_scalar($option) ? (string) $option : gettype($option)).'".');
 
             return self::FAILURE;
         }
 
-        $days = $option !== null && $option !== '' ? (int) $option : (int) config('private-media.audit.retention_days', 90);
+        $days = $option !== null ? (int) $option : (int) config('private-media.audit.retention_days', 90);
 
         if ($days < 1) {
             $this->components->error('Retention must be at least one day.');
@@ -45,6 +45,12 @@ class Prune extends Command
             $removed = $ids->isEmpty() ? 0 : AccessLog::query()->whereKey($ids->all())->delete();
             $deleted += $removed;
         } while ($removed > 0);
+
+        if ($ids->isNotEmpty()) {
+            $this->components->error("{$ids->count()} audit rows older than {$days} days could not be deleted ({$deleted} deleted). Check the database user's DELETE permission and any triggers on the table.");
+
+            return self::FAILURE;
+        }
 
         $this->components->info("Deleted {$deleted} audit rows older than {$days} days.");
 

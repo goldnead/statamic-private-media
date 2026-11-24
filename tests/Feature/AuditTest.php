@@ -3,6 +3,7 @@
 use Goldnead\PrivateMedia\Models\AccessLog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
@@ -101,7 +102,11 @@ it('still answers a refusal with its own status when the audit row cannot be wri
     Schema::drop('private_media_access_log');
     $viewer = viewer();
 
-    $this->actingAs($viewer)->getJson(mediaLink($viewer))->assertForbidden();
+    Log::spy();
+
+    $this->actingAs($viewer)->getJson(mediaLink($viewer))->assertForbidden()->assertJsonPath('error.code', 'no_access');
+
+    Log::shouldHaveReceived('error')->withArgs(fn ($message, $context) => $message === 'private-media: audit row could not be written' && isset($context['runbook']))->atLeast()->once();
 });
 
 it('refuses a --days value that is not a number instead of using the config', function () {
@@ -117,13 +122,23 @@ it('stops pruning when a delete removes nothing', function () {
         $this->markTestSkipped('Uses a SQLite trigger.');
     }
 
-    // A loop that never ends must fail the test, not hang the suite.
-    set_time_limit(15);
-
     DB::statement('CREATE TRIGGER keep_rows BEFORE DELETE ON private_media_access_log BEGIN SELECT RAISE(IGNORE); END');
     AccessLog::query()->create(['resource' => 'a', 'allowed' => true, 'reason' => 'served', 'created_at' => Carbon::now()->subDays(100)]);
 
-    $this->artisan('private-media:prune')->assertSuccessful();
+    // A loop that never ends must fail the test, not hang the suite.
+    set_time_limit(15);
+
+    try {
+        // Nothing could be deleted: that is a failure, not a green cron run.
+        $this->artisan('private-media:prune')->assertFailed();
+    } finally {
+        set_time_limit(0);
+        DB::statement('DROP TRIGGER keep_rows');
+    }
 
     expect(AccessLog::query()->count())->toBe(1);
 });
+
+it('refuses an empty or malformed --days value', function (string $value) {
+    $this->artisan('private-media:prune', ['--days' => $value])->assertFailed();
+})->with(['', '1.5', '-5', '5d', ' 5']);
