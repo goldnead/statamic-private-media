@@ -2,6 +2,7 @@
 
 use Goldnead\PrivateMedia\Models\AccessLog;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
@@ -87,4 +88,42 @@ it('prunes by a --days override', function () {
 
 it('refuses a retention below one day', function () {
     $this->artisan('private-media:prune', ['--days' => 0])->assertFailed();
+});
+
+it('still serves the file when the audit row cannot be written', function () {
+    Schema::drop('private_media_access_log');
+    $viewer = entitledViewer();
+
+    $this->actingAs($viewer)->get(mediaLink($viewer))->assertSuccessful();
+});
+
+it('still answers a refusal with its own status when the audit row cannot be written', function () {
+    Schema::drop('private_media_access_log');
+    $viewer = viewer();
+
+    $this->actingAs($viewer)->getJson(mediaLink($viewer))->assertForbidden();
+});
+
+it('refuses a --days value that is not a number instead of using the config', function () {
+    AccessLog::query()->create(['resource' => 'a', 'allowed' => true, 'reason' => 'served', 'created_at' => Carbon::now()->subDays(100)]);
+
+    $this->artisan('private-media:prune', ['--days' => 'abc'])->assertFailed();
+
+    expect(AccessLog::query()->count())->toBe(1);
+});
+
+it('stops pruning when a delete removes nothing', function () {
+    if (DB::connection()->getDriverName() !== 'sqlite') {
+        $this->markTestSkipped('Uses a SQLite trigger.');
+    }
+
+    // A loop that never ends must fail the test, not hang the suite.
+    set_time_limit(15);
+
+    DB::statement('CREATE TRIGGER keep_rows BEFORE DELETE ON private_media_access_log BEGIN SELECT RAISE(IGNORE); END');
+    AccessLog::query()->create(['resource' => 'a', 'allowed' => true, 'reason' => 'served', 'created_at' => Carbon::now()->subDays(100)]);
+
+    $this->artisan('private-media:prune')->assertSuccessful();
+
+    expect(AccessLog::query()->count())->toBe(1);
 });

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A failing audit write (missing table, database down) no longer turns a delivered file or a refusal into a 500. The failure is logged as an error with a runbook line.
+- `private-media:prune` fails on a non-numeric `--days` instead of silently using the configured retention, and no longer loops forever when a delete removes no rows.
+
 ## 0.1.2 (2026-11-16)
 
 ### Changed
