@@ -5,6 +5,7 @@ namespace Goldnead\PrivateMedia;
 use Goldnead\PrivateMedia\Support\MediaPath;
 use Goldnead\PrivateMedia\Support\UserId;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Statamic\Contracts\Assets\Asset;
 
@@ -30,13 +31,32 @@ class PrivateMedia
     public function url(mixed $user, string $resource, mixed $asset, ?int $ttlMinutes = null): ?string
     {
         $userId = UserId::tryOf($user);
+
+        // A guest gets no link by design: nothing to log.
+        if ($userId === null) {
+            return null;
+        }
+
+        // An empty optional asset field is an ordinary state in a template, not a
+        // misconfiguration: no link, no log line per rendered row.
+        if ($asset === null || $asset === '') {
+            return null;
+        }
+
         $path = $this->pathOf($asset);
 
-        if ($userId === null || $path === null || trim($resource) === '' || str_contains($resource, '/')) {
+        if ($path === null || trim($resource) === '' || str_contains($resource, '/')) {
+            Log::warning('private-media: no link, the resource or the asset is not valid.', [
+                'resource' => $resource,
+                'path' => is_string($asset) ? $asset : get_debug_type($asset),
+            ]);
+
             return null;
         }
 
         if (! app('router')->has(self::ROUTE)) {
+            Log::warning('private-media: no link, the delivery route is not registered.', ['resource' => $resource, 'path' => $path]);
+
             return null;
         }
 

@@ -6,11 +6,15 @@ use Goldnead\Entitlements\EntitlementManager;
 use Goldnead\PrivateMedia\Access\ClosedMediaAccess;
 use Goldnead\PrivateMedia\Access\EntitlementsMediaAccess;
 use Goldnead\PrivateMedia\Contracts\MediaAccess;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Statamic\Providers\AddonServiceProvider;
 
 class ServiceProvider extends AddonServiceProvider
 {
+    private static bool $closedWarned = false;
+
     public function register(): void
     {
         parent::register();
@@ -20,9 +24,7 @@ class ServiceProvider extends AddonServiceProvider
         // The access seam. entitlements is a `suggest`, so its presence is
         // checked, not assumed; without it every request is refused. A site
         // binding its own MediaAccess after this provider wins.
-        $this->app->bindIf(MediaAccess::class, fn ($app) => class_exists(EntitlementManager::class)
-            ? $app->make(EntitlementsMediaAccess::class)
-            : new ClosedMediaAccess);
+        $this->app->bindIf(MediaAccess::class, fn ($app) => $this->mediaAccess($app, class_exists(EntitlementManager::class)));
 
         // Bound by class name, never under a short slug.
         $this->app->singleton(PrivateMedia::class);
@@ -44,6 +46,24 @@ class ServiceProvider extends AddonServiceProvider
             ->registerCommands()
             ->registerDeliveryRoute()
             ->registerPublishables();
+    }
+
+    /**
+     * The default access seam. Without entitlements every file stays closed:
+     * logged once per process, so the cause is visible instead of silent.
+     */
+    protected function mediaAccess(Application $app, bool $entitlementsPresent): MediaAccess
+    {
+        if ($entitlementsPresent) {
+            return $app->make(EntitlementsMediaAccess::class);
+        }
+
+        if (! self::$closedWarned) {
+            self::$closedWarned = true;
+            Log::warning('private-media: no MediaAccess bound, every private file is closed. Install goldnead/statamic-entitlements (1.3 or later) or bind MediaAccess.');
+        }
+
+        return new ClosedMediaAccess;
     }
 
     /**
