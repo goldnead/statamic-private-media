@@ -37,6 +37,12 @@ class PrivateMedia
             return null;
         }
 
+        // An empty optional asset field is an ordinary state in a template, not a
+        // misconfiguration: no link, no log line per rendered row.
+        if ($asset === null || $asset === '') {
+            return null;
+        }
+
         $path = $this->pathOf($asset);
 
         if ($path === null || trim($resource) === '' || str_contains($resource, '/')) {
