@@ -118,7 +118,7 @@ class Deliverer
 
         $chunk = max(1024, (int) config('private-media.delivery.chunk_size', 8192));
 
-        return new StreamedResponse(function () use ($handle, $range, $chunk, $request): void {
+        return new StreamedResponse(function () use ($handle, $range, $chunk, $request, $file): void {
             try {
                 if ($request->isMethod('HEAD')) {
                     return;
@@ -138,6 +138,15 @@ class Deliverer
                     echo $bytes;
                     flush();
                     $remaining -= strlen($bytes);
+                }
+
+                // The headers are out and announced the full length: the
+                // viewer's player just stalls. Only the log can say why.
+                if ($remaining > 0) {
+                    Log::warning('private-media: stream ended early, the file is shorter than announced or unreadable', [
+                        'path' => $file->path,
+                        'missing_bytes' => $remaining,
+                    ]);
                 }
             } finally {
                 fclose($handle);

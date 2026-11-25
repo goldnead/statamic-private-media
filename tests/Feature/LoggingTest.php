@@ -33,6 +33,25 @@ it('logs the resource and the asset when a link cannot be made for a signed-in v
         ->once();
 });
 
+it('logs when the stream ends before the announced bytes were sent', function () {
+    Log::spy();
+    putMedia('videos/intro.mp4', '0123456789');
+    $viewer = entitledViewer();
+    $link = mediaLink($viewer);
+
+    $response = $this->actingAs($viewer)->get($link);
+    // The file shrinks after the headers went out with Content-Length 10.
+    putMedia('videos/intro.mp4', '0123');
+
+    expect($response->streamedContent())->toBe('0123');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn ($message, $context = []) => str_contains($message, 'stream ended early')
+            && ($context['path'] ?? null) === 'videos/intro.mp4'
+            && ($context['missing_bytes'] ?? null) === 6)
+        ->once();
+});
+
 it('does not log for a guest, who gets no link by design', function () {
     Log::spy();
 
